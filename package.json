@@ -1,0 +1,14 @@
+{
+  "name": "starhunt-websocket-server",
+  "version": "1.0.0",
+  "description": "WebSocket server for star hunting data",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.1",
+    "http": "^0.0.1-security",
+    "url": "^0.11.1"
+  }
+}
