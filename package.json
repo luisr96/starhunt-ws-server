@@ -7,8 +7,11 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "ws": "^8.18.1",
     "http": "^0.0.1-security",
-    "url": "^0.11.1"
+    "url": "^0.11.1",
+    "ws": "^8.18.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
   }
 }
