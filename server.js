@@ -4,23 +4,49 @@ const http = require("http");
 const server = http.createServer();
 const wss = new WebSocket.Server({ server });
 
+const fetchAndParseCSV = require("./starSpawnData");
+
 // Message types
 const MESSAGE_TYPES = {
   STAR_UPDATE: "STAR_UPDATE",
   STAR_REMOVE: "STAR_REMOVE",
   STAR_SYNC: "STAR_SYNC",
+  SPAWN_TIMES: "SPAWN_TIMES",
 };
 
 // Store stars by their unique world identifier
 const starMap = new Map();
 const clients = new Set();
 
+// Initialize spawn data with an empty array
+let currentSpawnData = [];
+
+// Fetch initial spawn data
+(async function initializeSpawnData() {
+  try {
+    currentSpawnData = await fetchAndParseCSV();
+    console.log("Initial spawn data loaded");
+  } catch (error) {
+    console.error("Error loading initial spawn data:", error);
+    currentSpawnData = []; // Ensure it's an empty array if fetch fails
+  }
+})();
+
 wss.on("connection", (ws) => {
   console.log("Client connected");
   clients.add(ws);
 
-  // Send all known stars immediately to the new client
+  // Send all known stars and spawn data immediately to the new client
   broadcastSync([ws]);
+
+  // Send spawn data to the new client (even if it's empty)
+  broadcastMessage(
+    {
+      type: "SPAWN_TIMES",
+      data: currentSpawnData,
+    },
+    [ws]
+  );
 
   ws.on("message", (message) => {
     try {
@@ -88,16 +114,18 @@ function handleStarRemove(data) {
  * Broadcasts a message to specified clients or all clients
  */
 function broadcastMessage(messageObj, targetClients = null) {
-  const clients = targetClients || clients;
-  if (clients.size === 0) return;
+  const clientList = targetClients || clients;
+  if (clientList.size === 0) return;
 
   const message = JSON.stringify(messageObj);
 
-  for (const client of clients) {
+  for (const client of clientList) {
     if (client.readyState === WebSocket.OPEN) {
       client.send(message);
     }
   }
+
+  console.log(messageObj);
 }
 
 /**
@@ -159,6 +187,20 @@ setInterval(() => {
     broadcastSync();
   }
 }, 5 * 60 * 1000); // Every 5 minutes
+
+// Update and broadcast spawn data every minute
+setInterval(async () => {
+  try {
+    currentSpawnData = await fetchAndParseCSV();
+
+    broadcastMessage({
+      type: "SPAWN_TIMES",
+      data: currentSpawnData,
+    });
+  } catch (error) {
+    console.error("Error fetching spawn data:", error);
+  }
+}, 1 * 60 * 1000); // Every minute
 
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
