@@ -5,6 +5,7 @@ const server = http.createServer();
 const wss = new WebSocket.Server({ server });
 
 const fetchAndParseCSV = require("./starSpawnData");
+const fetchDashboardData = require("./dashboardData");
 
 // Message types
 const MESSAGE_TYPES = {
@@ -12,6 +13,7 @@ const MESSAGE_TYPES = {
   STAR_REMOVE: "STAR_REMOVE",
   STAR_SYNC: "STAR_SYNC",
   SPAWN_TIMES: "SPAWN_TIMES",
+  DASHBOARD_UPDATE: "DASHBOARD_UPDATE",
 };
 
 // Store stars by their unique world identifier
@@ -20,14 +22,26 @@ const clients = new Set();
 
 // Initialize spawn data with an empty array
 let currentSpawnData = [];
+// Initialize dashboard data
+let currentDashboardData = {
+  waveEndsIn: "Unknown",
+  timeSinceWaveBegan: "Unknown",
+  startScoutingIn: "Unknown",
+  spawnPhaseStatus: "Unknown",
+};
 
 // Fetch initial spawn data
-(async function initializeSpawnData() {
+(async function initializeData() {
   try {
+    // Load spawn data
     currentSpawnData = await fetchAndParseCSV();
     console.log("Initial spawn data loaded");
+
+    // Load dashboard data
+    currentDashboardData = await fetchDashboardData();
+    console.log("Initial dashboard data loaded");
   } catch (error) {
-    console.error("Error loading initial spawn data:", error);
+    console.error("Error loading initial data:", error);
     currentSpawnData = []; // Ensure it's an empty array if fetch fails
   }
 })();
@@ -44,6 +58,15 @@ wss.on("connection", (ws) => {
     {
       type: "SPAWN_TIMES",
       data: currentSpawnData,
+    },
+    [ws]
+  );
+
+  // Send dashboard data to the new client
+  broadcastMessage(
+    {
+      type: "DASHBOARD_UPDATE",
+      data: currentDashboardData,
     },
     [ws]
   );
@@ -199,6 +222,20 @@ setInterval(async () => {
     });
   } catch (error) {
     console.error("Error fetching spawn data:", error);
+  }
+}, 1 * 60 * 1000); // Every minute
+
+// Update and broadcast dashboard data every minute
+setInterval(async () => {
+  try {
+    currentDashboardData = await fetchDashboardData();
+
+    broadcastMessage({
+      type: "DASHBOARD_UPDATE",
+      data: currentDashboardData,
+    });
+  } catch (error) {
+    console.error("Error fetching dashboard data:", error);
   }
 }, 1 * 60 * 1000); // Every minute
 
